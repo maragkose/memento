@@ -12,7 +12,8 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { loadConfig } from "../core/config.ts";
 import { connect } from "../core/db.ts";
-import { search, getNode, graphQuery, resume } from "../core/queries.ts";
+import { hybridSearch, getNode, graphQuery, resume } from "../core/queries.ts";
+import { buildEmbedder } from "../enrichment/registry.ts";
 import { log } from "../core/log.ts";
 
 function asText(data: unknown) {
@@ -22,14 +23,15 @@ function asText(data: unknown) {
 async function main(): Promise<void> {
   const cfg = loadConfig();
   const db = await connect(cfg);
+  const embed = buildEmbedder(cfg);
 
   const server = new McpServer({ name: "memento", version: "0.1.0" });
 
   server.tool(
     "memory_search",
     "Hybrid full-text/semantic search over past sessions, prompts, and decisions.",
-    { query: z.string(), project: z.string().optional(), kind: z.string().optional(), limit: z.number().optional() },
-    async (args) => asText(await search(db, args.query, args)),
+    { query: z.string(), project: z.string().optional(), tag: z.string().optional(), limit: z.number().optional() },
+    async (args) => asText(await hybridSearch(db, args.query, args, embed)),
   );
 
   server.tool(

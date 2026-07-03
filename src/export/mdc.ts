@@ -18,6 +18,23 @@ import { log } from "../core/log.ts";
 
 const MAX_SUMMARY = 400;
 const MAX_FILES = 8;
+const MAX_DECISIONS = 4;
+const MAX_DECISION = 160;
+
+function dedupeDecisions(
+  decisions: Array<{ text: string; kind?: string }>,
+): Array<{ text: string; kind?: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ text: string; kind?: string }> = [];
+  for (const d of decisions) {
+    if (!d?.text) continue;
+    const key = d.text.replace(/\s+/g, " ").trim().toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(d);
+  }
+  return out;
+}
 
 export async function exportMdc(db: Surreal, cfg: Config): Promise<string> {
   const sessions = await recentSessions(db, cfg.mdc.limit);
@@ -52,11 +69,16 @@ function render(sessions: DigestSession[]): string {
     for (const s of items) {
       const when = toDay(s.started_at);
       const title = (s.title ?? "session").replace(/\s+/g, " ").trim();
-      lines.push(`- **${title}**${when ? ` (${when})` : ""}`);
+      const pin = s.pinned ? "★ " : "";
+      lines.push(`- ${pin}**${title}**${when ? ` (${when})` : ""}`);
       const summary = clip((s.summary ?? "").replace(/\n+/g, " "), MAX_SUMMARY);
       if (summary && !sameText(summary, title)) lines.push(`  - ${summary}`);
       const files = normalizeFiles(s.files ?? []).slice(0, MAX_FILES);
       if (files.length) lines.push(`  - files: ${files.join(", ")}`);
+      for (const d of dedupeDecisions(s.decisions ?? []).slice(0, MAX_DECISIONS)) {
+        const tag = d.kind === "gotcha" ? "⚠ " : d.kind === "todo" ? "☐ " : "→ ";
+        lines.push(`  - ${tag}${clip(d.text.replace(/\n+/g, " "), MAX_DECISION)}`);
+      }
     }
     lines.push("");
   }

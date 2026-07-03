@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/components/DecisionsView.tsx","./src/components/GraphView.tsx","./src/components/SearchBar.tsx","./src/components/SessionPanel.tsx","./src/components/StatsView.tsx","./src/components/TimelineView.tsx","./src/lib/colors.ts","./vite.config.ts"],"version":"5.9.3"}

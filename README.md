@@ -81,12 +81,17 @@ cat ~/.cursor/rules/memento.mdc
 ### On-demand queries
 
 ```bash
-./run.sh cli search "surrealdb schema"                 # full-text search
+./run.sh cli search "surrealdb schema"                 # hybrid search
 ./run.sh cli search "pdlc report" --project home-maragos-ai --limit 5
 ./run.sh cli resume --project home-maragos-ai          # cold-start briefing
 ./run.sh cli stats                                     # node counts
 ./run.sh cli export                                    # force-rewrite the .mdc now
 ```
+
+**Hybrid search:** `search` is BM25 full-text by default. Set `MEM_EMBED=ollama`
+(and enrich with embeddings) to add semantic vector search — results from both are
+fused with Reciprocal Rank Fusion. With no embeddings it stays pure BM25, so it
+works out of the box and gets better when you turn embeddings on.
 
 Project slugs are the `## headings` in the `.mdc` file.
 
@@ -111,6 +116,74 @@ surfaced via `search`, MCP, and the web UI — they are **not** added to the dig
 - **PDF:** text is extracted if the optional `pdf-parse` dep is installed (it's in
   `optionalDependencies`); otherwise PDFs are indexed by filename only.
 
+### Decisions, gotchas & TODOs
+
+On enrichment, memento mines each session transcript for **decisions**
+("we decided…", "going with…", "use X instead"), **gotchas** ("gotcha", "root
+cause", "the bug was…", "fixed by…"), and **TODOs** ("todo", "next step",
+"follow-up"). These are stored as `decision` nodes (`session ->decided-> decision`)
+and surfaced three ways:
+
+- **CLI/MCP `search`** — decisions are searchable alongside sessions, prompts, and notes.
+- **Web UI** — a dedicated **Decisions** tab (filter by kind, click through to the
+  session); also listed in the session drill-down panel.
+- **Digest** — up to a few per session appear under each entry in the `.mdc` file,
+  marked `→` (decision), `⚠` (gotcha), `☐` (todo).
+
+Extraction is deterministic (no LLM required) and idempotent — re-reading a grown
+transcript replaces the session's decisions rather than duplicating them.
+
+### Git integration
+
+memento indexes **commits from your local git repos** so your work history and
+your code history live in one graph. Each commit becomes a `commit` node (searchable
+by message) linked to the files it changed (`commit ->changed-> file`) — reusing the
+same `file` nodes sessions touch, which auto-connects commits to the sessions that
+worked on those files.
+
+```bash
+./run.sh cli git                       # index commits now (daemon also does this)
+./run.sh cli search "fix race condition"   # commits appear as type: "commit"
+```
+
+- **Repo discovery:** set `MEM_GIT_ROOTS` (a `:`-separated list of repo dirs), or
+  leave it empty to auto-discover git repos under `$HOME` (depth `MEM_GIT_SCAN_DEPTH`,
+  default 2; caches/dotdirs skipped).
+- **Window:** only commits newer than `MEM_GIT_LOOKBACK_DAYS` (default 180) are
+  ingested, capped at `MEM_GIT_MAX_COMMITS` per repo (default 500). Sync is
+  incremental (hashes already stored are skipped) — disable entirely with `MEM_GIT=false`.
+
+### Ask & recall (local RAG with citations)
+
+Two retrieval commands sit on top of hybrid search:
+
+```bash
+./run.sh cli recall "how did we set up hybrid search"   # cited context, no LLM
+./run.sh cli ask "why did we pick RRF over reranking?"   # grounded answer + citations
+```
+
+- **`recall`** is retrieval-only and always available: it returns the top sources
+  (sessions, notes, decisions, commits, prompts) each with a citation line
+  `[n] <type> (project, date) — title` and a short snippet.
+- **`ask`** feeds those numbered sources to an LLM and asks it to answer using only
+  them, citing inline as `[n]`. It needs a model (`MEM_ENRICH=ollama`); with no LLM
+  configured it degrades to `recall`. Both honor `--project` and `--limit`, and use
+  semantic vectors automatically when embeddings are enabled.
+
+### Related (cross-entity links)
+
+memento connects entities by **shared-file co-occurrence**, computed at query time
+(always fresh, never stale): for any session it finds other sessions that touched
+the same files (ranked by overlap), the files themselves, notes in the same
+project, and **commits** that changed those same files.
+
+```bash
+./run.sh cli related "auth refactor"   # related sessions/files/notes/commits for the best match
+```
+
+In the web UI this appears as a **Related** section in the session drill-down
+(click a related session to jump to it).
+
 ### Service lifecycle (`run.sh`)
 
 | Command | Purpose |
@@ -122,12 +195,14 @@ surfaced via `search`, MCP, and the web UI — they are **not** added to the dig
 | `./run.sh logs [db\|daemon\|serve]` | tail a service log |
 | `./run.sh bootstrap` | start db + init schema + full backfill |
 | `./run.sh serve` | start the web UI / API server |
+| `./run.sh cli <cmd> …` | run a CLI command (`search`, `notes`, `pin`, `doctor`, …) |
 
 ## Visualization (web UI)
 
 A local, read-only web app to explore the graph: an interactive **2D/3D
-force-graph**, a per-project **timeline**, a **stats dashboard**, and live
-**search** with drill-down into any session's summary, files, and transcript.
+force-graph**, a per-project **timeline**, a **decisions** feed, a **stats
+dashboard**, and live **search** with drill-down into any session's summary,
+files, decisions, related sessions/notes, and transcript.
 
 Stack: a tiny Node `http` JSON API (`src/serve`, loopback-only) + a Vite + React +
 Tailwind SPA (`web/`) with `react-force-graph` (WebGL).
@@ -170,6 +245,11 @@ Copy `.env.example` to `.env` (the installer does this). Key settings:
 | `MEM_NOTES_EXTS` | `.md,.markdown,.txt,.org,.rst,.pdf` | file types to index |
 | `MEM_NOTES_MAX_BYTES` | `1000000` | skip files larger than this |
 | `MEM_NOTES_IGNORE` | (dotdirs, caches, …) | directory names to skip |
+| `MEM_GIT` | `true` | index commits from local git repos |
+| `MEM_GIT_ROOTS` | (auto) | `:`-separated repo dirs; empty = auto-discover under `$HOME` |
+| `MEM_GIT_SCAN_DEPTH` | `2` | auto-discovery depth below `$HOME` (0 disables) |
+| `MEM_GIT_LOOKBACK_DAYS` | `180` | only ingest commits newer than this |
+| `MEM_GIT_MAX_COMMITS` | `500` | cap per repo (newest first) |
 | `MEM_SERVE_HOST` / `MEM_SERVE_PORT` | `127.0.0.1` / `7077` | web UI / API bind address |
 
 ## Manual / development
@@ -191,10 +271,10 @@ npm run dev:daemon
 
 ```
 src/core/        types, config, db, schema, queries, graph, log
-src/adapters/    SourceAdapter + cursor / claude (stub) + notes (files/docs)
+src/adapters/    SourceAdapter + cursor / claude (stub) + notes (files/docs) + git (commits)
 src/enrichment/  EnrichmentProvider + deterministic / llm + run helper
 src/export/      MdcExporter (always-apply rules-file digest)
-src/ingest/      backfill (full + incremental sync) + notes + live enrichment subscriber
+src/ingest/      backfill (full + incremental sync) + notes + git + live enrichment subscriber
 src/daemon/      long-running ingest + enrichment + export process
 src/mcp/         stdio MCP server
 src/cli/         standalone CLI

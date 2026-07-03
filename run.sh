@@ -10,6 +10,7 @@
 #   ./run.sh stop  [db|daemon|serve|all]  Stop services (default: all)
 #   ./run.sh restart [db|daemon|serve|all] Stop then start
 #   ./run.sh serve                   Start the web UI / API server (background)
+#   ./run.sh cli <cmd> [args...]     Run a CLI command (search, notes, pin, doctor, …)
 #   ./run.sh status                  Show what's running
 #   ./run.sh logs [db|daemon|serve]  Tail a service log (Ctrl-C to exit)
 #   ./run.sh bootstrap               init schema + backfill Cursor sessions
@@ -18,10 +19,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-DATA_DIR="${MEM_DATA_DIR:-${HOME}/.local/share/memento}"
-DB_DIR="${DATA_DIR}/db"
-LOG_DIR="${DATA_DIR}/logs"
-RUN_DIR="${DATA_DIR}/run"
+# Resolved in main() after .env is loaded so MEM_DATA_DIR can be set there.
+DATA_DIR=""; DB_DIR=""; LOG_DIR=""; RUN_DIR=""
+resolve_paths() {
+  DATA_DIR="${MEM_DATA_DIR:-${HOME}/.local/share/memento}"
+  DB_DIR="${DATA_DIR}/db"
+  LOG_DIR="${DATA_DIR}/logs"
+  RUN_DIR="${DATA_DIR}/run"
+}
 
 # ----- output helpers -----
 if [[ -t 1 ]]; then
@@ -187,8 +192,9 @@ cmd_bootstrap() {
 }
 
 main() {
-  mkdir -p "$DB_DIR" "$LOG_DIR" "$RUN_DIR"
   load_env
+  resolve_paths
+  mkdir -p "$DB_DIR" "$LOG_DIR" "$RUN_DIR"
   resolve_config
   local cmd="${1:-}"; shift || true
   case "$cmd" in
@@ -196,6 +202,7 @@ main() {
     stop)      cmd_stop "${1:-all}" ;;
     restart)   cmd_stop "${1:-all}"; cmd_start "${1:-all}" ;;
     serve)     start_serve ;;
+    cli)       cli "$@" ;;
     status)    cmd_status ;;
     logs)      cmd_logs "${1:-daemon}" ;;
     bootstrap) cmd_bootstrap ;;

@@ -23,9 +23,60 @@ export class DeterministicProvider implements EnrichmentProvider {
       .filter(Boolean)
       .join("\n");
 
-    return { summary, title, decisions: [] };
+    return { summary, title, decisions: extractDecisions(input.prompts) };
   }
 }
+
+/** Category patterns, tested in priority order (first match wins per sentence). */
+const PATTERNS: Array<{ kind: string; re: RegExp }> = [
+  {
+    kind: "gotcha",
+    re: /\b(gotcha|caveat|watch out|be careful|turned out|root cause|the (?:issue|problem|bug|error) (?:was|is)|fixed by|workaround|beware|pitfall|the trick (?:was|is)|note that)\b/i,
+  },
+  {
+    kind: "decision",
+    re: /\b(decided|we(?:'ll| will) use|let'?s use|going with|went with|chose|choose to|opt(?:ed)? for|switch(?:ed)? to|use \w+ instead|instead of|the approach is|plan is to|agreed to)\b/i,
+  },
+  {
+    kind: "todo",
+    re: /\b(todo|to-?do|next step|follow[- ]?up|still (?:need|needs|to do)|remaining (?:task|work)|not yet (?:done|implemented))\b/i,
+  },
+];
+
+/**
+ * Heuristic extraction of decisions / gotchas / TODOs from a session's prompts.
+ * Deterministic and noisy-tolerant: conservative confidence, deduped, capped.
+ */
+export function extractDecisions(
+  prompts: Array<{ actor: string; text: string }>,
+): SessionSummary["decisions"] {
+  const out: SessionSummary["decisions"] = [];
+  const seen = new Set<string>();
+  for (const p of prompts) {
+    const clean = stripWrappers(p.text ?? "");
+    for (const sentence of splitSentences(clean)) {
+      const s = sentence.trim();
+      if (s.length < 12 || s.length > 240) continue;
+      const hit = PATTERNS.find((pat) => pat.re.test(s));
+      if (!hit) continue;
+      const key = norm(s);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ text: s.replace(/\s+/g, " ").trim(), kind: hit.kind, confidence: 0.6 });
+      if (out.length >= 8) return out;
+    }
+  }
+  return out;
+}
+
+function splitSentences(text: string): string[] {
+  return text
+    .split(/\n+|(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+const norm = (s: string): string => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 /**
  * Cursor prompts are wrapped in system-injected blocks (<timestamp>,

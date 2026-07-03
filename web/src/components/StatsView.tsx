@@ -18,10 +18,13 @@ export default function StatsView({ data, onPickProject }: { data: Stats; onPick
   return (
     <div className="h-full overflow-auto p-6">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 lg:grid-cols-6">
           <Card label="Sessions" value={data.counts.session} />
           <Card label="Prompts" value={data.counts.prompt} />
           <Card label="Files" value={data.counts.file} />
+          <Card label="Notes" value={data.counts.document} />
+          <Card label="Decisions" value={data.counts.decision} />
+          <Card label="Commits" value={data.counts.commit} />
         </div>
 
         {/* Activity over time */}

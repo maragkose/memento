@@ -6,7 +6,7 @@
 import type { Surreal } from "surrealdb";
 import type { EnrichmentProvider } from "./types.ts";
 import type { SessionForSummary } from "../core/types.ts";
-import { setSessionSummary } from "../core/graph.ts";
+import { setSessionSummary, addDecision } from "../core/graph.ts";
 
 export async function enrichSession(
   db: Surreal,
@@ -23,4 +23,9 @@ export async function enrichSession(
     embedding = (await provider.embed([summaryObj.summary]))[0];
   }
   await setSessionSummary(db, rid, summaryObj.summary, embedding, summaryObj.title);
+
+  // Persist extracted decisions/gotchas/TODOs (prior ones were cleared on re-read).
+  for (const d of summaryObj.decisions ?? []) {
+    await addDecision(db, rid, d);
+  }
 }

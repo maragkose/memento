@@ -40,6 +40,8 @@ DEFINE FIELD IF NOT EXISTS project ON document TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS ext ON document TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS bytes ON document TYPE option<number>;
 DEFINE FIELD IF NOT EXISTS source_mtime ON document TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS pinned ON document TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS tags ON document TYPE option<array<string>>;
 DEFINE INDEX IF NOT EXISTS document_path ON document FIELDS path UNIQUE;
 DEFINE INDEX IF NOT EXISTS document_ft_content ON document FIELDS content FULLTEXT ANALYZER cm_text BM25;
 DEFINE INDEX IF NOT EXISTS document_ft_title ON document FIELDS title FULLTEXT ANALYZER cm_text BM25;
@@ -60,6 +62,17 @@ DEFINE FIELD IF NOT EXISTS kind ON decision TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS confidence ON decision TYPE option<number>;
 DEFINE INDEX IF NOT EXISTS decision_ft ON decision FIELDS text FULLTEXT ANALYZER cm_text BM25;
 
+-- Git commits: searchable by message, linked to files (changed) + project.
+DEFINE TABLE IF NOT EXISTS commit SCHEMALESS;
+DEFINE FIELD IF NOT EXISTS hash ON commit TYPE string;
+DEFINE FIELD IF NOT EXISTS message ON commit TYPE string;
+DEFINE FIELD IF NOT EXISTS author ON commit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS branch ON commit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS repo ON commit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS project ON commit TYPE option<string>;
+DEFINE FIELD IF NOT EXISTS committed_at ON commit TYPE option<datetime>;
+DEFINE INDEX IF NOT EXISTS commit_ft ON commit FIELDS message FULLTEXT ANALYZER cm_text BM25;
+
 DEFINE TABLE IF NOT EXISTS person SCHEMALESS;
 DEFINE FIELD IF NOT EXISTS email ON person TYPE option<string>;
 
@@ -76,8 +89,18 @@ DEFINE FIELD IF NOT EXISTS status ON session TYPE string DEFAULT 'raw';
 DEFINE FIELD IF NOT EXISTS started_at ON session TYPE option<datetime>;
 DEFINE FIELD IF NOT EXISTS ended_at ON session TYPE option<datetime>;
 DEFINE FIELD IF NOT EXISTS source_mtime ON session TYPE option<datetime>;
+DEFINE FIELD IF NOT EXISTS pinned ON session TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS tags ON session TYPE option<array<string>>;
 DEFINE INDEX IF NOT EXISTS session_uident ON session FIELDS tool, external_id UNIQUE;
 DEFINE INDEX IF NOT EXISTS session_ft ON session FIELDS summary FULLTEXT ANALYZER cm_text BM25;
+
+-- ---------- edges (relations) ----------
+-- Defined explicitly so DELETE/clear works even on a fresh namespace.
+DEFINE TABLE IF NOT EXISTS about TYPE RELATION;
+DEFINE TABLE IF NOT EXISTS contains TYPE RELATION;
+DEFINE TABLE IF NOT EXISTS touched TYPE RELATION;
+DEFINE TABLE IF NOT EXISTS decided TYPE RELATION;
+DEFINE TABLE IF NOT EXISTS changed TYPE RELATION;
 `;
 
 /**
@@ -96,5 +119,5 @@ DEFINE INDEX IF NOT EXISTS document_vec ON document FIELDS content_embedding HNS
 export async function applySchema(db: Surreal, opts: { withVectors?: boolean } = {}): Promise<void> {
   await db.query(DDL);
   if (opts.withVectors) await db.query(vectorDDL(EMBED_DIM));
-  log.info(`schema applied${opts.withVectors ? " (incl. vector indexes)" : ""}`);
+  log.debug(`schema applied${opts.withVectors ? " (incl. vector indexes)" : ""}`);
 }

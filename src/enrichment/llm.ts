@@ -30,6 +30,17 @@ export class OllamaProvider implements EnrichmentProvider {
     return out;
   }
 
+  /** Free-form completion (used by the `ask` RAG command). */
+  async generate(prompt: string): Promise<string> {
+    const res = await fetch(`${this.cfg.ollama.url}/api/generate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: this.cfg.ollama.model, prompt, stream: false }),
+    });
+    const json = (await res.json()) as { response?: string };
+    return (json.response ?? "").trim();
+  }
+
   async summarize(input: SessionForSummary): Promise<SessionSummary> {
     const context = renderContext(input);
     try {

@@ -14,7 +14,9 @@ import { buildEnrichment } from "../enrichment/registry.ts";
 import { startEnrichmentSubscriber } from "../ingest/live.ts";
 import { syncChanged } from "../ingest/backfill.ts";
 import { syncDocuments } from "../ingest/notes.ts";
+import { syncCommits } from "../ingest/git.ts";
 import { NotesSource } from "../adapters/notes.ts";
+import { GitSource } from "../adapters/git.ts";
 import { exportMdc } from "../export/mdc.ts";
 import { log } from "../core/log.ts";
 
@@ -32,6 +34,7 @@ async function main(): Promise<void> {
   // and refresh the digest whenever something changed. No manual backfill.
   const adapters = [...buildAdapters(cfg).values()];
   const notes = cfg.notes.enabled ? new NotesSource(cfg) : undefined;
+  const gitSrc = cfg.git.enabled ? new GitSource(cfg) : undefined;
   let syncing = false;
   const syncOnce = async () => {
     if (syncing) return; // skip overlapping ticks
@@ -48,6 +51,10 @@ async function main(): Promise<void> {
       // Notes/documents (not part of the digest; searchable via CLI/MCP/web).
       if (notes) {
         await syncDocuments(db, cfg, notes).catch((e) => log.warn("notes sync failed", e));
+      }
+      // Git commits (searchable; linked to files/projects).
+      if (gitSrc) {
+        await syncCommits(db, cfg, gitSrc).catch((e) => log.warn("git sync failed", e));
       }
       if (updated > 0 && cfg.mdc.enabled) await exportSafe();
     } finally {

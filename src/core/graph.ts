@@ -5,7 +5,7 @@
 import type { Surreal } from "surrealdb";
 import type { RawEvent, SessionStatus } from "./types.ts";
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
@@ -63,7 +63,22 @@ export async function clearSessionContent(db: Surreal, sessionRidStr: string): P
     `LET $ps = (SELECT VALUE out FROM contains WHERE in = ${sessionRidStr});
      DELETE prompt WHERE id IN $ps;
      DELETE contains WHERE in = ${sessionRidStr};
-     DELETE touched WHERE in = ${sessionRidStr};`,
+     DELETE touched WHERE in = ${sessionRidStr};
+     LET $ds = (SELECT VALUE out FROM decided WHERE in = ${sessionRidStr});
+     DELETE decision WHERE id IN $ds;
+     DELETE decided WHERE in = ${sessionRidStr};`,
+  );
+}
+
+export async function addDecision(
+  db: Surreal,
+  sessionRidStr: string,
+  d: { text: string; kind?: string; confidence?: number },
+): Promise<void> {
+  await db.query(
+    `LET $d = (CREATE decision SET text = $text, kind = $kind, confidence = $conf)[0].id;
+     RELATE ${sessionRidStr}->decided->$d;`,
+    { text: d.text, kind: d.kind ?? "note", conf: d.confidence ?? 0.5 },
   );
 }
 
@@ -120,6 +135,70 @@ export async function existingDocumentMtimes(db: Surreal): Promise<Map<string, s
     map.set(r.path, mt);
   }
   return map;
+}
+
+/** Build a quoted record id string from a table + key (handles ::/paths). */
+export function ridFrom(table: string, key: string): string {
+  return `${table}:⟨${key}⟩`.replace(/[⟨⟩]/g, "`");
+}
+
+/** Deterministic commit id (per repo, so identical hashes across forks don't clash). */
+export function commitRid(repoSlug: string, hash: string): string {
+  return `commit:⟨${repoSlug}::${hash}⟩`.replace(/[⟨⟩]/g, "`");
+}
+
+/** Set of commit hashes already ingested for a repo (for incremental sync). */
+export async function existingCommitHashes(db: Surreal, repoSlug: string): Promise<Set<string>> {
+  const [rows] = await db.query<[Array<{ hash: string }>]>(
+    `SELECT hash FROM commit WHERE repo = $repo;`,
+    { repo: repoSlug },
+  );
+  return new Set((rows ?? []).map((r) => r.hash));
+}
+
+/**
+ * Insert a commit and link it to the files it changed (reusing shared `file`
+ * nodes by absolute path — the same nodes sessions touch). Idempotent per hash;
+ * callers should skip hashes already present to avoid duplicate `changed` edges.
+ */
+export async function addCommit(
+  db: Surreal,
+  repoSlug: string,
+  c: { hash: string; message: string; author?: string; branch?: string; project?: string; committedAt?: string; files: string[] },
+): Promise<void> {
+  const id = commitRid(repoSlug, c.hash);
+  const sets = ["hash = $hash", "message = $message", "repo = $repo"];
+  const params: Record<string, unknown> = { hash: c.hash, message: c.message, repo: repoSlug, paths: c.files };
+  if (c.author) { sets.push("author = $author"); params.author = c.author; }
+  if (c.branch) { sets.push("branch = $branch"); params.branch = c.branch; }
+  if (c.project) { sets.push("project = $project"); params.project = c.project; }
+  if (c.committedAt) { sets.push("committed_at = <datetime> $at"); params.at = c.committedAt; }
+  await db.query(`UPSERT ${id} SET ${sets.join(", ")};`, params);
+  if (c.files.length > 0) {
+    await db.query(
+      `FOR $p IN $paths {
+         LET $f = (UPSERT file SET path = $p WHERE path = $p RETURN id)[0].id
+             ?? (CREATE file SET path = $p)[0].id;
+         RELATE ${id}->changed->$f;
+       };`,
+      { paths: c.files },
+    );
+  }
+  if (c.project) {
+    await db.query(
+      `LET $p = (SELECT VALUE id FROM project WHERE slug = $slug)[0];
+       IF $p THEN RELATE ${id}->about->$p END;`,
+      { slug: slugify(c.project) },
+    );
+  }
+}
+
+export async function setPinned(db: Surreal, rid: string, pinned: boolean): Promise<void> {
+  await db.query(`UPDATE ${rid} SET pinned = $p;`, { p: pinned });
+}
+
+export async function addTags(db: Surreal, rid: string, tags: string[]): Promise<void> {
+  await db.query(`UPDATE ${rid} SET tags = array::distinct((tags ?? []) + $t);`, { t: tags });
 }
 
 export async function addPrompt(

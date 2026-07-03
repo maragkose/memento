@@ -3,15 +3,17 @@ import { api, type GraphData, type SearchHit, type Stats, type Timeline } from "
 import GraphView from "./components/GraphView.tsx";
 import TimelineView from "./components/TimelineView.tsx";
 import StatsView from "./components/StatsView.tsx";
+import DecisionsView from "./components/DecisionsView.tsx";
 import SearchBar from "./components/SearchBar.tsx";
 import SessionPanel from "./components/SessionPanel.tsx";
 import { projectColor } from "./lib/colors.ts";
 
-type View = "graph" | "timeline" | "stats";
+type View = "graph" | "timeline" | "decisions" | "stats";
 
 const TABS: Array<{ id: View; label: string }> = [
   { id: "graph", label: "Graph" },
   { id: "timeline", label: "Timeline" },
+  { id: "decisions", label: "Decisions" },
   { id: "stats", label: "Stats" },
 ];
 
@@ -108,11 +110,14 @@ export default function App() {
         {view === "timeline" && (
           <TimelineView data={timelineFiltered} highlight={highlight} onSelectSession={setSelected} />
         )}
+        {view === "decisions" && (
+          <DecisionsView project={project} onSelectSession={setSelected} />
+        )}
         {view === "stats" && stats && (
           <StatsView data={stats} onPickProject={(p) => { setProject(p); setView("graph"); }} />
         )}
 
-        <SessionPanel sessionId={selected} onClose={() => setSelected(null)} />
+        <SessionPanel sessionId={selected} onClose={() => setSelected(null)} onSelectSession={setSelected} />
       </main>
     </div>
   );

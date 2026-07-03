@@ -4,8 +4,10 @@
  *   GET /api/stats            counts, per-project, per-day, top files
  *   GET /api/graph[?project=] nodes + edges (sessions/files/projects)
  *   GET /api/timeline         sessions for the timeline swimlanes
+ *   GET /api/decisions[?project=&kind=]  extracted decisions/gotchas/TODOs
  *   GET /api/search?q=[&project=]
- *   GET /api/session/:id      drill-down (summary, prompts, files)
+ *   GET /api/session/:id      drill-down (summary, prompts, files, decisions)
+ *   GET /api/related/:id      related sessions/files/notes (shared-file co-occurrence)
  *   GET /*                    static SPA from web/dist
  *
  * Binds to loopback only. No writes, no auth (local-first, single user).
@@ -19,8 +21,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../core/config.ts";
 import { getDb } from "../core/db.ts";
+import { buildEmbedder } from "../enrichment/registry.ts";
 import { log } from "../core/log.ts";
-import { graphData, timelineData, statsData, sessionDetail, searchData } from "./data.ts";
+import { graphData, timelineData, statsData, sessionDetail, searchData, decisionsData, relatedData } from "./data.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(HERE, "..", "..", "web", "dist");
@@ -71,6 +74,7 @@ function notFound(res: http.ServerResponse): void {
 async function main(): Promise<void> {
   const cfg = loadConfig();
   const db = await getDb(cfg);
+  const embed = buildEmbedder(cfg);
   const hasWeb = fs.existsSync(path.join(WEB_DIR, "index.html"));
   if (!hasWeb) log.warn(`web/dist not built yet (${WEB_DIR}); API is up, UI 404s. Run: (cd web && npm install && npm run build)`);
 
@@ -82,11 +86,16 @@ async function main(): Promise<void> {
         if (p === "/api/stats") return sendJson(res, 200, await statsData(db));
         if (p === "/api/graph") return sendJson(res, 200, await graphData(db, { project: url.searchParams.get("project") ?? undefined }));
         if (p === "/api/timeline") return sendJson(res, 200, await timelineData(db));
-        if (p === "/api/search") return sendJson(res, 200, await searchData(db, url.searchParams.get("q") ?? "", url.searchParams.get("project") ?? undefined));
+        if (p === "/api/decisions") return sendJson(res, 200, await decisionsData(db, { project: url.searchParams.get("project") ?? undefined, kind: url.searchParams.get("kind") ?? undefined }));
+        if (p === "/api/search") return sendJson(res, 200, await searchData(db, url.searchParams.get("q") ?? "", url.searchParams.get("project") ?? undefined, embed));
         if (p.startsWith("/api/session/")) {
           const id = decodeURIComponent(p.slice("/api/session/".length));
           const detail = await sessionDetail(db, id);
           return detail ? sendJson(res, 200, detail) : sendJson(res, 404, { error: "not found" });
+        }
+        if (p.startsWith("/api/related/")) {
+          const id = decodeURIComponent(p.slice("/api/related/".length));
+          return sendJson(res, 200, await relatedData(db, id));
         }
         return sendJson(res, 404, { error: "unknown endpoint" });
       }

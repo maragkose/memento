@@ -51,6 +51,14 @@ export interface Config {
     maxBytes: number; // skip files larger than this
     ignoreDirs: string[]; // directory names to skip anywhere in the tree
   };
+  /** Git indexing: commits/branches from local repos, linked to files/projects. */
+  git: {
+    enabled: boolean;
+    roots: string[]; // explicit repo dirs; empty => auto-discover under $HOME
+    scanDepth: number; // auto-discovery depth below $HOME (0 disables the scan)
+    lookbackDays: number; // only ingest commits newer than this
+    maxCommits: number; // hard cap per repo (newest first)
+  };
   dataDir: string;
 }
 
@@ -107,6 +115,13 @@ export function loadConfig(): Config {
           "node_modules,.git,.cache,.local,.config,.ssh,.gnupg,.npm,.cargo,.rustup,.venv,venv,__pycache__,dist,build,.next,target,.Trash,snap",
         ),
       ),
+    },
+    git: {
+      enabled: env("MEM_GIT", "true") !== "false",
+      roots: pathList(env("MEM_GIT_ROOTS", "")),
+      scanDepth: Number(env("MEM_GIT_SCAN_DEPTH", "2")),
+      lookbackDays: Number(env("MEM_GIT_LOOKBACK_DAYS", "180")),
+      maxCommits: Number(env("MEM_GIT_MAX_COMMITS", "500")),
     },
     dataDir: path.join(home, ".local", "share", "memento"),
   };

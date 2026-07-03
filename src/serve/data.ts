@@ -4,7 +4,7 @@
  * simpler and more portable than leaning on SurrealDB GROUP BY quirks.
  */
 import type { Surreal } from "surrealdb";
-import { search as ftSearch } from "../core/queries.ts";
+import { hybridSearch, type Embedder } from "../core/queries.ts";
 import type { SearchHit } from "../core/types.ts";
 
 export interface SessionLite {
@@ -129,7 +129,7 @@ export async function timelineData(db: Surreal): Promise<TimelineData> {
 }
 
 export interface StatsData {
-  counts: { session: number; prompt: number; file: number };
+  counts: { session: number; prompt: number; file: number; document: number; decision: number; commit: number };
   byProject: Array<{ project: string; n: number }>;
   byDay: Array<{ day: string; n: number }>;
   topFiles: Array<{ path: string; label: string; n: number }>;
@@ -138,9 +138,9 @@ export interface StatsData {
 export async function statsData(db: Surreal): Promise<StatsData> {
   const [sessions, touched] = await Promise.all([fetchSessions(db), fetchTouched(db)]);
   const [countRows] = await db.query<[Array<{ n: number; tb: string }>]>(
-    `SELECT count() AS n, meta::tb(id) AS tb FROM session, prompt, file GROUP BY tb;`,
+    `SELECT count() AS n, meta::tb(id) AS tb FROM session, prompt, file, document, decision, commit GROUP BY tb;`,
   );
-  const counts = { session: 0, prompt: 0, file: 0 };
+  const counts = { session: 0, prompt: 0, file: 0, document: 0, decision: 0, commit: 0 };
   for (const r of countRows ?? []) {
     if (r.tb in counts) (counts as Record<string, number>)[r.tb] = r.n;
   }
@@ -176,6 +176,7 @@ export interface SessionDetail {
   status?: string;
   files: string[];
   prompts: Array<{ role: string; text: string }>;
+  decisions: Array<{ text: string; kind?: string; confidence?: number }>;
 }
 
 export async function sessionDetail(db: Surreal, id: string): Promise<SessionDetail | null> {
@@ -184,10 +185,18 @@ export async function sessionDetail(db: Surreal, id: string): Promise<SessionDet
   // (which scans the whole prompt table).
   const rid = "session:`" + id + "`";
   const [head] = await db.query<
-    [Array<Omit<SessionDetail, "prompts"> & { prompts?: Array<{ role: string; text: string }> }>]
+    [
+      Array<
+        Omit<SessionDetail, "prompts" | "decisions"> & {
+          prompts?: Array<{ role: string; text: string }>;
+          decisions?: Array<{ text: string; kind?: string; confidence?: number }>;
+        }
+      >,
+    ]
   >(
     `SELECT meta::id(id) AS id, title, summary, project, started_at, status,
             ->touched->file.path AS files,
+            ->decided->decision.{ text, kind, confidence } AS decisions,
             ->contains->prompt.{ role, text } AS prompts
      FROM type::record($rid);`,
     { rid },
@@ -198,12 +207,128 @@ export async function sessionDetail(db: Surreal, id: string): Promise<SessionDet
     ...s,
     files: (s.files ?? []).filter(Boolean),
     prompts: (s.prompts ?? []).filter((p) => p && p.text).slice(0, 300),
+    decisions: (s.decisions ?? []).filter((d) => d && d.text),
   };
 }
 
-export async function searchData(db: Surreal, q: string, project?: string): Promise<SearchHit[]> {
+export interface DecisionItem {
+  text: string;
+  kind: string;
+  confidence?: number;
+  session: string; // meta id
+  title?: string;
+  project?: string;
+  started_at?: string;
+}
+
+/** All extracted decisions/gotchas/TODOs with their originating session, newest first. */
+export async function decisionsData(
+  db: Surreal,
+  opts: { project?: string; kind?: string } = {},
+): Promise<DecisionItem[]> {
+  const [rows] = await db.query<[DecisionItem[]]>(
+    `SELECT
+        out.text AS text,
+        out.kind AS kind,
+        out.confidence AS confidence,
+        meta::id(in) AS session,
+        in.title AS title,
+        in.project AS project,
+        in.started_at AS started_at
+     FROM decided
+     ORDER BY started_at DESC;`,
+  );
+  let items = (rows ?? []).filter((d) => d.text);
+  if (opts.project) items = items.filter((d) => d.project === opts.project);
+  if (opts.kind) items = items.filter((d) => d.kind === opts.kind);
+  return items;
+}
+
+export interface RelatedData {
+  files: Array<{ path: string; label: string }>;
+  sessions: Array<{ id: string; title?: string; project?: string; shared: number }>;
+  documents: Array<{ id: string; title?: string; project?: string }>;
+  commits: Array<{ id: string; message: string; committed_at?: string; shared: number }>;
+}
+
+/**
+ * Cross-entity "related" for a session, computed at query time (always fresh):
+ *  - files it touched,
+ *  - other sessions that touched any of the same files (ranked by overlap),
+ *  - notes/documents in the same project.
+ */
+export async function relatedData(db: Surreal, metaId: string): Promise<RelatedData> {
+  const empty: RelatedData = { files: [], sessions: [], documents: [], commits: [] };
+  const rid = "session:`" + metaId + "`";
+  const [head] = await db.query<[Array<{ project?: string; files?: string[] }>]>(
+    `SELECT project, ->touched->file.path AS files FROM type::record($rid);`,
+    { rid },
+  );
+  const self = head?.[0];
+  if (!self) return empty;
+  const paths = (self.files ?? []).filter(Boolean);
+
+  // Sessions sharing any of those files (aggregate overlap in JS).
+  const shared = new Map<string, number>();
+  if (paths.length > 0) {
+    const [rows] = await db.query<[Array<{ s: string; path: string }>]>(
+      `SELECT meta::id(in) AS s, out.path AS path FROM touched WHERE out.path IN $paths;`,
+      { paths },
+    );
+    for (const r of rows ?? []) {
+      if (r.s === metaId) continue;
+      shared.set(r.s, (shared.get(r.s) ?? 0) + 1);
+    }
+  }
+  const topIds = [...shared.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([id]) => id);
+  let sessions: RelatedData["sessions"] = [];
+  if (topIds.length > 0) {
+    const [meta] = await db.query<[Array<{ id: string; title?: string; project?: string }>]>(
+      `SELECT meta::id(id) AS id, title, project FROM session WHERE meta::id(id) IN $ids;`,
+      { ids: topIds },
+    );
+    const byId = new Map((meta ?? []).map((m) => [m.id, m]));
+    sessions = topIds.map((id) => ({ ...(byId.get(id) ?? { id }), shared: shared.get(id) ?? 0 }));
+  }
+
+  let documents: RelatedData["documents"] = [];
+  if (self.project) {
+    const [docs] = await db.query<[RelatedData["documents"]]>(
+      `SELECT meta::id(id) AS id, (title ?? path) AS title, project
+       FROM document WHERE project = $p LIMIT 8;`,
+      { p: self.project },
+    );
+    documents = docs ?? [];
+  }
+
+  // Commits that changed any of the same files (overlap-ranked).
+  let commits: RelatedData["commits"] = [];
+  if (paths.length > 0) {
+    const [rows] = await db.query<[Array<{ id: string; message: string; committed_at?: string; path: string }>]>(
+      `SELECT meta::id(in) AS id, in.message AS message, in.committed_at AS committed_at, out.path AS path
+       FROM changed WHERE out.path IN $paths;`,
+      { paths },
+    );
+    const agg = new Map<string, { id: string; message: string; committed_at?: string; shared: number }>();
+    for (const r of rows ?? []) {
+      const cur = agg.get(r.id);
+      if (cur) cur.shared++;
+      else agg.set(r.id, { id: r.id, message: r.message, committed_at: r.committed_at, shared: 1 });
+    }
+    commits = [...agg.values()].sort((a, b) => b.shared - a.shared).slice(0, 8);
+  }
+
+  return {
+    files: paths.map((path) => ({ path, label: shortPath(path) })),
+    sessions,
+    documents,
+    commits,
+  };
+}
+
+export async function searchData(db: Surreal, q: string, project?: string, embed?: Embedder): Promise<SearchHit[]> {
   if (!q.trim()) return [];
-  return ftSearch(db, q, { project, limit: 30 });
+  return hybridSearch(db, q, { project, limit: 30 }, embed);
 }
 
 function shortPath(p: string): string {
