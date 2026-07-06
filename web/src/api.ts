@@ -1,4 +1,4 @@
-// Typed client for the local memento API (src/serve/server.ts).
+// Typed client for the local memorcy API (src/serve/server.ts).
 
 export interface GraphNode {
   id: string;

@@ -61,7 +61,7 @@ export default function App() {
       <header className="flex items-center gap-4 border-b border-slate-800 bg-slate-900/60 px-4 py-2.5 backdrop-blur">
         <div className="flex items-center gap-2">
           <div className="h-6 w-6 rounded bg-gradient-to-br from-sky-400 to-fuchsia-500" />
-          <span className="text-sm font-semibold tracking-tight">memento</span>
+          <span className="text-sm font-semibold tracking-tight">memorcy</span>
         </div>
 
         <nav className="flex rounded-lg border border-slate-800 bg-slate-900 p-0.5">

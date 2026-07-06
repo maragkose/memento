@@ -1,5 +1,5 @@
 {
-  "name": "memento",
+  "name": "memorcy",
   "version": "0.1.0",
   "description": "Local-first, cross-tool context memory bank for AI coding sessions (SurrealDB LPG + MCP).",
   "type": "module",
@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "bin": {
-    "memento": "dist/cli/index.js"
+    "memorcy": "dist/cli/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

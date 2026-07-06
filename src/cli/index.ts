@@ -2,12 +2,12 @@
  * Standalone CLI for the memory bank (works without any AI tool).
  *
  * Usage:
- *   memento init
- *   memento backfill --tool cursor
- *   memento search "surrealdb schema" [--project <slug>]
- *   memento resume --project <slug>
- *   memento export
- *   memento stats
+ *   memorcy init
+ *   memorcy backfill --tool cursor
+ *   memorcy search "surrealdb schema" [--project <slug>]
+ *   memorcy resume --project <slug>
+ *   memorcy export
+ *   memorcy stats
  */
 import { loadConfig } from "../core/config.ts";
 import { getDb, closeDb } from "../core/db.ts";
@@ -112,7 +112,7 @@ async function main(): Promise<void> {
     }
     case "recall": {
       const query = _.slice(1).join(" ") || flags.query || "";
-      if (!query) throw new Error("usage: memento recall <query>");
+      if (!query) throw new Error("usage: memorcy recall <query>");
       const db = await getDb(cfg);
       const sources = await retrieve(
         db,
@@ -129,7 +129,7 @@ async function main(): Promise<void> {
     }
     case "ask": {
       const query = _.slice(1).join(" ") || flags.query || "";
-      if (!query) throw new Error("usage: memento ask <question>");
+      if (!query) throw new Error("usage: memorcy ask <question>");
       const db = await getDb(cfg);
       const embed = buildEmbedder(cfg);
       const chat = buildChat(cfg);
@@ -163,7 +163,7 @@ async function main(): Promise<void> {
     case "pin":
     case "unpin": {
       const query = _.slice(1).join(" ") || flags.query || "";
-      if (!query) throw new Error(`usage: memento ${cmd} <query>`);
+      if (!query) throw new Error(`usage: memorcy ${cmd} <query>`);
       const db = await getDb(cfg);
       const hit = await resolveTopHit(db, query);
       if (!hit) { console.log("no match"); break; }
@@ -174,7 +174,7 @@ async function main(): Promise<void> {
     case "tag": {
       const tag = _[1];
       const query = _.slice(2).join(" ") || flags.query || "";
-      if (!tag || !query) throw new Error("usage: memento tag <tag> <query>");
+      if (!tag || !query) throw new Error("usage: memorcy tag <tag> <query>");
       const db = await getDb(cfg);
       const hit = await resolveTopHit(db, query);
       if (!hit) { console.log("no match"); break; }
@@ -193,7 +193,7 @@ async function main(): Promise<void> {
     }
     case "related": {
       const query = _.slice(1).join(" ") || flags.query || "";
-      if (!query) throw new Error("usage: memento related <query>");
+      if (!query) throw new Error("usage: memorcy related <query>");
       const db = await getDb(cfg);
       const hit = await resolveTopHit(db, query);
       if (!hit) { console.log("no match"); break; }
@@ -221,7 +221,7 @@ async function main(): Promise<void> {
     }
     case "restore": {
       const file = flags.file ?? _[1];
-      if (!file) throw new Error("usage: memento restore --file <dump.surql>");
+      if (!file) throw new Error("usage: memorcy restore --file <dump.surql>");
       const db = await getDb(cfg);
       await restore(db, file);
       console.log(`restored from ${file}`);
@@ -230,7 +230,7 @@ async function main(): Promise<void> {
     default:
       console.log(
         [
-          "memento <command>",
+          "memorcy <command>",
           "  init                      initialize schema",
           "  backfill --tool cursor    ingest existing sessions",
           "  notes                     index notes/files from configured roots",

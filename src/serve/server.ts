@@ -107,7 +107,7 @@ async function main(): Promise<void> {
   });
 
   server.listen(PORT, HOST, () => {
-    log.info(`memento UI on http://${HOST}:${PORT}  (api: /api/stats)`);
+    log.info(`memorcy UI on http://${HOST}:${PORT}  (api: /api/stats)`);
   });
 
   const shutdown = () => {

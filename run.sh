@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run.sh — lifecycle manager for memento (SurrealDB + daemon).
+# run.sh — lifecycle manager for memorcy (SurrealDB + daemon).
 #
 # install.sh sets the machine up once; run.sh starts/stops the long-running
 # processes and bootstraps your data.
@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 # Resolved in main() after .env is loaded so MEM_DATA_DIR can be set there.
 DATA_DIR=""; DB_DIR=""; LOG_DIR=""; RUN_DIR=""
 resolve_paths() {
-  DATA_DIR="${MEM_DATA_DIR:-${HOME}/.local/share/memento}"
+  DATA_DIR="${MEM_DATA_DIR:-${HOME}/.local/share/memorcy}"
   DB_DIR="${DATA_DIR}/db"
   LOG_DIR="${DATA_DIR}/logs"
   RUN_DIR="${DATA_DIR}/run"

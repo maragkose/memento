@@ -1,4 +1,4 @@
-# memento
+# memorcy
 
 A local-first, cross-tool **context memory bank** for AI coding sessions.
 
@@ -10,7 +10,7 @@ already knows what you've been working on.
 Two ways the memory reaches your editor:
 
 1. **Rules-file injection (default, zero-config):** the daemon writes an
-   always-applied Cursor rule at `~/.cursor/rules/memento.mdc`. Every chat,
+   always-applied Cursor rule at `~/.cursor/rules/memorcy.mdc`. Every chat,
    in every project, reads it automatically at start. No MCP server, no tool call,
    no admin permission.
 2. **MCP + CLI:** query the graph on demand (`search`, `resume`, `stats`).
@@ -43,7 +43,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full design.
 ```text
 Cursor transcripts                SurrealDB (graph + FTS + vectors)         Cursor
 ~/.cursor/projects/**/*.jsonl  ─▶  session ─contains─▶ prompt          ─▶  ~/.cursor/rules/
-        │  (adapter)                   └─touched─▶ file                     memento.mdc
+        │  (adapter)                   └─touched─▶ file                     memorcy.mdc
         │                              └─about───▶ project                  (always-applied)
         ▼                                   ▲                                     ▲
    daemon: poll for new/changed  ──────────┘   digest export (every change) ──────┘
@@ -91,10 +91,10 @@ auto-generated rule file. The daemon keeps everything fresh from here on.
 
 ### Automatic (no action needed)
 
-The daemon maintains `~/.cursor/rules/memento.mdc`. Inspect what it feeds Cursor:
+The daemon maintains `~/.cursor/rules/memorcy.mdc`. Inspect what it feeds Cursor:
 
 ```bash
-cat ~/.cursor/rules/memento.mdc
+cat ~/.cursor/rules/memorcy.mdc
 ```
 
 ### On-demand queries
@@ -116,7 +116,7 @@ Project slugs are the `## headings` in the `.mdc` file.
 
 ### Notes & files indexing
 
-Beyond AI sessions, memento can index your **notes/files** (markdown, text, org,
+Beyond AI sessions, memorcy can index your **notes/files** (markdown, text, org,
 rst, PDF) so their content is searchable alongside your session history. The daemon
 walks the configured roots on the same poll loop (incremental by mtime); notes are
 surfaced via `search`, MCP, and the web UI — they are **not** added to the digest.
@@ -137,7 +137,7 @@ surfaced via `search`, MCP, and the web UI — they are **not** added to the dig
 
 ### Decisions, gotchas & TODOs
 
-On enrichment, memento mines each session transcript for **decisions**
+On enrichment, memorcy mines each session transcript for **decisions**
 ("we decided…", "going with…", "use X instead"), **gotchas** ("gotcha", "root
 cause", "the bug was…", "fixed by…"), and **TODOs** ("todo", "next step",
 "follow-up"). These are stored as `decision` nodes (`session ->decided-> decision`)
@@ -154,7 +154,7 @@ transcript replaces the session's decisions rather than duplicating them.
 
 ### Git integration
 
-memento indexes **commits from your local git repos** so your work history and
+memorcy indexes **commits from your local git repos** so your work history and
 your code history live in one graph. Each commit becomes a `commit` node (searchable
 by message) linked to the files it changed (`commit ->changed-> file`) — reusing the
 same `file` nodes sessions touch, which auto-connects commits to the sessions that
@@ -191,7 +191,7 @@ Two retrieval commands sit on top of hybrid search:
 
 ### Related (cross-entity links)
 
-memento connects entities by **shared-file co-occurrence**, computed at query time
+memorcy connects entities by **shared-file co-occurrence**, computed at query time
 (always fresh, never stale): for any session it finds other sessions that touched
 the same files (ranked by overlap), the files themselves, notes in the same
 project, and **commits** that changed those same files.
@@ -250,11 +250,11 @@ Copy `.env.example` to `.env` (the installer does this). Key settings:
 | --- | --- | --- |
 | `MEM_DB_URL` | `ws://127.0.0.1:8000/rpc` | SurrealDB endpoint |
 | `MEM_DB_USER` / `MEM_DB_PASS` | `root` / `root` | credentials |
-| `MEM_DB_NS` / `MEM_DB_DB` | `memento` / `memory` | namespace / database |
+| `MEM_DB_NS` / `MEM_DB_DB` | `memorcy` / `memory` | namespace / database |
 | `MEM_ENRICH` | `deterministic` | `deterministic` \| `ollama` \| `openai` \| `gemini` |
 | `MEM_EMBED` | `none` | `none` \| `ollama` \| `openai` \| `transformers` |
 | `MEM_MDC` | `true` | write the always-apply rule file |
-| `MEM_MDC_PATH` | `~/.cursor/rules/memento.mdc` | rule file location |
+| `MEM_MDC_PATH` | `~/.cursor/rules/memorcy.mdc` | rule file location |
 | `MEM_MDC_LIMIT` | `12` | max sessions in the digest |
 | `MEM_MDC_INTERVAL_MS` | `300000` | digest safety-net re-export cadence |
 | `MEM_INGEST_WATCH` | `true` | daemon auto-ingests new/changed sessions |

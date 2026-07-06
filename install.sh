@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# install.sh — set up memento on this machine.
+# install.sh — set up memorcy on this machine.
 #
 # Steps: check prerequisites -> install npm deps -> build -> create .env + data dir
 #        -> (optional) install SurrealDB -> (optional) register MCP with Cursor.
@@ -20,7 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 NODE_MIN_MAJOR=22
-DATA_DIR="${HOME}/.local/share/memento"
+DATA_DIR="${HOME}/.local/share/memorcy"
 MCP_CONFIG="${HOME}/.cursor/mcp.json"
 
 # ----- options -----
@@ -174,10 +174,10 @@ const path = process.env.MCP_CONFIG;
 let cfg = {};
 try { cfg = JSON.parse(fs.readFileSync(path, "utf8")); } catch {}
 cfg.mcpServers = cfg.mcpServers || {};
-cfg.mcpServers["memento"] = { command: process.env.MCP_CMD, args: JSON.parse(process.env.MCP_ARGS) };
+cfg.mcpServers["memorcy"] = { command: process.env.MCP_CMD, args: JSON.parse(process.env.MCP_ARGS) };
 fs.writeFileSync(path, JSON.stringify(cfg, null, 2) + "\n");
 NODE
-  ok "MCP server 'memento' registered"
+  ok "MCP server 'memorcy' registered"
 }
 
 print_next_steps() {
@@ -197,7 +197,7 @@ Next steps (via run.sh — the lifecycle manager):
        npm run dev:cli -- resume --project home-maragos
   Manage services anytime: ./run.sh start|stop|restart|status|logs
 
-The daemon writes an always-apply digest to ~/.cursor/rules/memento.mdc,
+The daemon writes an always-apply digest to ~/.cursor/rules/memorcy.mdc,
 so any Cursor chat sees recent history with no MCP required. If you also
 registered MCP, restart Cursor to expose the memory tools (see ARCHITECTURE.md §8).
 EOF
@@ -205,7 +205,7 @@ EOF
 
 main() {
   parse_args "$@"
-  info "memento installer (dir: $SCRIPT_DIR)"
+  info "memorcy installer (dir: $SCRIPT_DIR)"
   check_node
   install_deps
   build_project

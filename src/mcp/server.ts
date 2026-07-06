@@ -4,8 +4,8 @@
  * (all logging goes to stderr — see core/log.ts).
  *
  * Register in ~/.cursor/mcp.json:
- *   { "mcpServers": { "memento": { "command": "node",
- *     "args": ["/home/maragos/memento/dist/mcp/server.js"] } } }
+ *   { "mcpServers": { "memorcy": { "command": "node",
+ *     "args": ["/home/maragos/memorcy/dist/mcp/server.js"] } } }
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   const db = await connect(cfg);
   const embed = buildEmbedder(cfg);
 
-  const server = new McpServer({ name: "memento", version: "0.1.0" });
+  const server = new McpServer({ name: "memorcy", version: "0.1.0" });
 
   server.tool(
     "memory_search",

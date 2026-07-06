@@ -76,7 +76,7 @@ export function loadConfig(): Config {
       url: env("MEM_DB_URL", "ws://127.0.0.1:8000/rpc"),
       user: env("MEM_DB_USER", "root"),
       pass: env("MEM_DB_PASS", "root"),
-      namespace: env("MEM_DB_NS", "memento"),
+      namespace: env("MEM_DB_NS", "memorcy"),
       database: env("MEM_DB_DB", "memory"),
     },
     enrich: env("MEM_ENRICH", "deterministic") as EnrichMode,
@@ -94,7 +94,7 @@ export function loadConfig(): Config {
     },
     mdc: {
       enabled: env("MEM_MDC", "true") !== "false",
-      path: env("MEM_MDC_PATH", path.join(home, ".cursor", "rules", "memento.mdc")),
+      path: env("MEM_MDC_PATH", path.join(home, ".cursor", "rules", "memorcy.mdc")),
       limit: Number(env("MEM_MDC_LIMIT", "12")),
       intervalMs: Number(env("MEM_MDC_INTERVAL_MS", "300000")), // 5 min
     },
@@ -123,6 +123,6 @@ export function loadConfig(): Config {
       lookbackDays: Number(env("MEM_GIT_LOOKBACK_DAYS", "180")),
       maxCommits: Number(env("MEM_GIT_MAX_COMMITS", "500")),
     },
-    dataDir: path.join(home, ".local", "share", "memento"),
+    dataDir: path.join(home, ".local", "share", "memorcy"),
   };
 }

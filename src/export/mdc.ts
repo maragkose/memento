@@ -48,7 +48,7 @@ function render(sessions: DigestSession[]): string {
   const generated = new Date().toISOString();
   const header = [
     "---",
-    "description: Auto-generated context memory of recent AI coding sessions. Managed by memento — do not edit by hand.",
+    "description: Auto-generated context memory of recent AI coding sessions. Managed by memorcy — do not edit by hand.",
     "alwaysApply: true",
     "---",
     "",
@@ -82,7 +82,7 @@ function render(sessions: DigestSession[]): string {
     }
     lines.push("");
   }
-  lines.push("_To search deeper history, use the memento CLI or MCP tools._", "");
+  lines.push("_To search deeper history, use the memorcy CLI or MCP tools._", "");
   return lines.join("\n");
 }
 

@@ -1,4 +1,4 @@
-# memento — Architecture
+# memorcy — Architecture
 
 A local-first, cross-tool **context memory bank** for AI coding sessions. It ingests
 session data from Cursor (and other tools) plus your home directory, builds a
@@ -222,7 +222,7 @@ trigger; MCP is the data.
 - **Secret scrubbing** on ingest (transcripts/commands can contain tokens) — regex +
   entropy filters before persistence.
 - **Project scoping** to prevent cross-project bleed; global search is explicit.
-- SurrealDB data dir under `~/.local/share/memento/`.
+- SurrealDB data dir under `~/.local/share/memorcy/`.
 
 ---
 
@@ -244,7 +244,7 @@ trigger; MCP is the data.
 ## 11. Repository layout
 
 ```
-memento/
+memorcy/
 ├─ ARCHITECTURE.md          # this file
 ├─ README.md
 ├─ package.json

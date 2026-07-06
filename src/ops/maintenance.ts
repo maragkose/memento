@@ -68,7 +68,7 @@ export async function prune(db: Surreal): Promise<{ removedDocuments: number }> 
 export async function backup(db: Surreal, cfg: Config, file?: string): Promise<string> {
   const dir = path.join(cfg.dataDir, "backups");
   await fsp.mkdir(dir, { recursive: true });
-  const target = file ?? path.join(dir, `memento-${new Date().toISOString().replace(/[:.]/g, "-")}.surql`);
+  const target = file ?? path.join(dir, `memorcy-${new Date().toISOString().replace(/[:.]/g, "-")}.surql`);
   const anyDb = db as unknown as { export?: () => Promise<string> };
   if (typeof anyDb.export !== "function") throw new Error("this SurrealDB SDK build has no export(); upgrade the driver");
   const dump = await anyDb.export();
